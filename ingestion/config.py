@@ -66,8 +66,8 @@ SELECTED_COLUMNS = [
 DB_CONFIG = {
     "host": os.getenv("POSTGRES_HOST", "localhost"),
     "port": os.getenv("POSTGRES_PORT", "5432"),
-    "dbname": os.getenv("POSTGRES_DB", "bts"),
-    "user": os.getenv("POSTGRES_USER", "postgres"),
+    "dbname": os.getenv("POSTGRES_DB", "bts_airline"),
+    "user": os.getenv("POSTGRES_USER", "root"),
     "password": os.getenv("POSTGRES_PASSWORD", ""),# its empty for security
 }
  
