@@ -100,8 +100,7 @@ services:
       context: ..          # repo root, so COPY processing/ works in Dockerfile
       dockerfile: docker/spark/Dockerfile
     environment:
-      # Hardcoded path — avoids ${VAR} interpolation bug with env_file
-      GOOGLE_APPLICATION_CREDENTIALS: /opt/spark/keys/gcp-key.json
+      GOOGLE_APPLICATION_CREDENTIALS: /opt/spark/keys/bd-project-cemputer-credentials.json
     volumes:
       - ../infra/keys:/opt/spark/keys        # directory mount, not single file
       - ../processing:/opt/spark/processing  # live mount for development
