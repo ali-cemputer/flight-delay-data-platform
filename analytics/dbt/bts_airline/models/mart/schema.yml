@@ -34,6 +34,10 @@ models:
         description: "Number of flights with 16-60 minutes delay."
       - name: total_severe_delayed
         description: "Number of flights with more than 60 minutes delay."
+      - name: total_diverted_flights
+        description: "Total number of flights diverted to another airport in this month."
+      - name: diverted_rate_pct
+        description: "Percentage of diverted flights in this month (%)"
 
   - name: mart_airport_bottlenecks
     description: "Departure/arrival traffic volume and taxi/delay bottleneck analysis by airport."
