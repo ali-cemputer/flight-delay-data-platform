@@ -13,10 +13,10 @@ Türkçe README dosyası: [docs/tr_README.md](docs/tr_README.md)
 
 ABD iç hat uçuş verilerini uçtan uca işleyen, gecikme ve iptal örüntülerini görselleştiren batch data pipeline.
 
+![Dashboard](doc_images/Project_Diagram.svg)
+
+
 ABD'de her yıl milyonlarca iç hat uçuşu gerçekleşiyor; ancak gecikme, iptal ve havalimanı yoğunluk desenlerini ham veri içinden anlamlı hale getirmek zor ve maliyetlidir. Bu proje, BTS/TranStats kaynağından 2023–2025 dönemine ait 20,9 milyon kayıtlık veriyi otomatik indirir, Bronze → Silver → Gold katman mimarisinde işler ve iş metriklerini interaktif bir dashboard ile sunar.
-
-
-![Dashboard](doc_images/dashboard.png)
 
 ---
 
@@ -201,6 +201,8 @@ dbt testleri: `not_null`, `unique`, `accepted_values` — tüm modeller `dbt tes
 ## 7. Dashboard
 
 Streamlit ile geliştirilmiş interaktif dashboard, BigQuery mart tablolarını direkt sorgular. `@st.cache_data(ttl=3600)` ile sorgu sonuçları önbelleğe alınır. Sayfa üstündeki yıl filtresi (2023 / 2024 / 2025) ilgili tile'ları dinamik olarak günceller.
+
+![Dashboard](doc_images/dashboard.png)
 
 ### KPI Kartları (sayfa başı)
 

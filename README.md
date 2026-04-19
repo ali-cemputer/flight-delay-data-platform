@@ -12,10 +12,8 @@
 >Türkçe README dosyası: [docs/tr_README.md](docs/tr_README.md)
 
 An end-to-end batch data pipeline that processes US domestic flight data and visualizes delay and cancellation patterns.
-
+![Project Diagram](docs/doc_images/Project_Diagram.svg)
 Millions of domestic flights take place in the US every year; however, making sense of delay, cancellation, and airport congestion patterns from raw data is difficult and costly. This project automatically downloads 20.9 million records from BTS/TranStats covering 2023–2025, processes them through a Bronze → Silver → Gold layered architecture, and presents business metrics through an interactive dashboard.
-
-![Dashboard](docs/doc_images/dashboard.png)
 
 ---
 
@@ -200,6 +198,8 @@ dbt tests: `not_null`, `unique`, `accepted_values` — all models validated with
 ## 7. Dashboard
 
 The interactive dashboard built with Streamlit queries BigQuery mart tables directly. Query results are cached with `@st.cache_data(ttl=3600)`. The year filter at the top of the page (2023 / 2024 / 2025) dynamically updates the relevant tiles.
+
+![Dashboard](docs/doc_images/dashboard.png)
 
 ### KPI Cards (page header)
 
