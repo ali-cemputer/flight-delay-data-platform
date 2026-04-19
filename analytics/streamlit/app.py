@@ -60,7 +60,7 @@ airline_name_map = df_flights.set_index("reporting_airline")["airline_name"].to_
 # ============================================================
 st.title("✈️ BTS Airline On-Time Performance Dashboard")
 st.caption(
-    "Data source: [Bureau of Transportation Statistics](https://www.transtats.bts.gov/) · Updated hourly"
+    "Data source: [Bureau of Transportation Statistics](https://www.transtats.bts.gov/) · Last Updated Data: 12/2025"
 )
 
 st.divider()
