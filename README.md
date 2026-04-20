@@ -10,6 +10,8 @@
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 
 >Türkçe README dosyası: [docs/tr_README.md](docs/tr_README.md)
+>
+>**Live Dashboard:** [Streamlit](https://bts-airline-data-platform.streamlit.app/)
 
 An end-to-end batch data pipeline that processes US domestic flight data and visualizes delay and cancellation patterns.
 ![Project Diagram](docs/doc_images/Project_Diagram.svg)
@@ -197,6 +199,8 @@ dbt tests: `not_null`, `unique`, `accepted_values` — all models validated with
 
 ## 7. Dashboard
 
+**Live Dashboard:** [Streamlit](https://bts-airline-data-platform.streamlit.app/)
+
 The interactive dashboard built with Streamlit queries BigQuery mart tables directly. Query results are cached with `@st.cache_data(ttl=3600)`. The year filter at the top of the page (2023 / 2024 / 2025) dynamically updates the relevant tiles.
 
 ![Dashboard](docs/doc_images/dashboard.png)
@@ -319,76 +323,192 @@ bd_project/
 ### Requirements
 
 - Docker and Docker Compose
-- Python 3.11+ and [uv](https://docs.astral.sh/uv/)
+- Python 3.13+ and [uv](https://docs.astral.sh/uv/)
 - GCP account (service account + JSON key)
 - Terraform
 
 ### Setup Steps
 
+#### 1. Clone the repo
 ```bash
-# 1. Clone the repo
 git clone <repo-url>
 cd bd_project
+```
 
-# 2. Set up Python environment
+#### 2. Set up Python environment
+```bash
 uv sync
+```
 
-# 3. Install dbt (isolated environment — prevents dependency conflicts)
+#### 3. Install dbt (isolated environment — prevents dependency conflicts)
+```bash
 uv tool install dbt-core --with dbt-bigquery
+```
 
-# 4. Configure environment variables
-cp .env.example .env
-# Edit .env:
-# POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
-# PGADMIN_DEFAULT_EMAIL, PGADMIN_DEFAULT_PASSWORD
-# AIRFLOW_UID (Linux: get with id -u command)
-# AIRFLOW__CORE__FERNET_KEY
-# AIRFLOW__DATABASE__SQL_ALCHEMY_CONN
-# GCP_PROJECT_ID, GCS_BUCKET_NAME, BQ_DATASET
-# GOOGLE_APPLICATION_CREDENTIALS=/app/keys/gcp-key.json
+#### 4. Place GCP service account JSON key
 
-# 5. Place GCP service account JSON key
+Create a service account in GCP Console with roles: `Storage Admin`, `BigQuery Admin`, `BigQuery Job User`. Download the JSON key:
+
+```bash
 mkdir -p infra/keys
-cp /path/to/your/gcp-key.json infra/keys/gcp-key.json
+cp /path/to/your/key.json infra/keys/your-key-filename.json
+```
 
-# 6. Provision GCP infrastructure with Terraform
+> `infra/keys/` is in `.gitignore` — the key is never committed to the repo.
+
+#### 5. Configure environment variables
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and fill in all values:
+
+| Variable | Description | Example |
+|---|---|---|
+| `POSTGRES_USER` | PostgreSQL username | `root` |
+| `POSTGRES_HOST` | PostgreSQL host | `postgres` |
+| `POSTGRES_PASSWORD` | PostgreSQL password | `root` |
+| `POSTGRES_DB` | Database name | `bts_airline` |
+| `PGADMIN_DEFAULT_EMAIL` | pgAdmin login email | `admin@admin.com` |
+| `PGADMIN_DEFAULT_PASSWORD` | pgAdmin password | `root` |
+| `AIRFLOW_UID` | Linux user ID — run `id -u` | `1000` |
+| `AIRFLOW__CORE__FERNET_KEY` | Generate: `python -c "import base64,os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"` | |
+| `AIRFLOW__WEBSERVER__SECRET_KEY` | Same generation method as Fernet key | |
+| `AIRFLOW__DATABASE__SQL_ALCHEMY_CONN` | Must match POSTGRES values | `postgresql+psycopg2://root:root@postgres:5432/bts_airline` |
+| `AIRFLOW__CORE__BASE_LOG_FOLDER` | Airflow log path inside container | `/opt/airflow/logs` |
+| `AIRFLOW__LOGGING__BASE_LOG_FOLDER` | Airflow log path inside container | `/opt/airflow/logs` |
+| `GCP_PROJECT_ID` | Your GCP project ID | `my-gcp-project` |
+| `GCS_BUCKET_NAME` | GCS bucket name (set after Terraform apply) | `my-project-bucket` |
+| `BQ_DATASET` | BigQuery staging dataset | `bts_airline` |
+| `GCP_KEY_FILENAME` | JSON key filename only — not full path | `your-key-filename.json` |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Key path inside Streamlit/Airflow container | `/app/keys/your-key-filename.json` |
+| `GCS_KEY_PATH` | Key path inside Airflow container for ingestion scripts | `/opt/airflow/keys/your-key-filename.json` |
+| `DBT_KEY_PATH` | Absolute path on host machine for dbt | `/home/user/bd_project/infra/keys/your-key-filename.json` |
+
+> **Important:** `GCP_KEY_FILENAME` is the single variable that controls the key path across all containers. When switching GCP accounts, only this variable and the JSON file need to change.
+
+#### 6. Provision GCP infrastructure with Terraform
+
+```bash
 cd infra
 cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars
+# Edit terraform.tfvars: project_id, bucket_name, region, credentials_file, service_account_email
 terraform init
+terraform plan
 terraform apply
 cd ..
+```
 
-# 7. Start Docker services
+After apply, update `GCS_BUCKET_NAME` in `.env` with the bucket name from Terraform output.
+
+#### 7. Configure dbt profile
+
+dbt reads credentials from the host machine. Create `~/.dbt/profiles.yml`:
+
+```yaml
+bts_airline:
+  outputs:
+    dev:
+      type: bigquery
+      method: service-account
+      project: "{{ env_var('GCP_PROJECT_ID') }}"
+      dataset: bts_dbt
+      keyfile: "{{ env_var('DBT_KEY_PATH') }}"
+      location: EU
+      threads: 4
+      job_execution_timeout_seconds: 300
+      job_retries: 1
+      priority: interactive
+  target: dev
+```
+
+Export the required env vars before running dbt (or add to `~/.bashrc` / `~/.zshrc`):
+
+```bash
+export GCP_PROJECT_ID=<your-project-id>
+export DBT_KEY_PATH=<absolute-path-to-key.json>
+```
+
+#### 8. Start Docker services
+
+```bash
 docker compose -f docker/docker-compose.yaml up -d --build
+```
 
-# 8. Create PostgreSQL schemas (once, on first setup)
-pgcli -h localhost -p 5432 -U <POSTGRES_USER> -d <POSTGRES_DB>
-# Inside pgcli:
-# CREATE SCHEMA raw;
-# CREATE SCHEMA staging;
+The `airflow-init` container runs once to initialize the Airflow database, then exits — this is expected.
 
-# 9. Start pipeline from Airflow UI
-# http://localhost:8080 → admin / admin
-# bts_ingestion_dag → Enable → Backfill (2023-01-01 → 2025-12-01)
-# bts_processing_dag → Enable → Backfill
+#### 9. Create PostgreSQL schemas (first setup only)
 
-# 10. Build dbt mart models
+```bash
+uv run pgcli -h localhost -p 5432 -U <POSTGRES_USER> -d <POSTGRES_DB>
+```
+
+Inside pgcli:
+
+```sql
+CREATE SCHEMA raw;
+CREATE SCHEMA staging;
+\q
+```
+
+#### 10. Run the ingestion pipeline
+
+Open Airflow UI at `http://localhost:8080` (admin / admin), then run backfill via CLI:
+
+```bash
+# ELT + ETL pipeline — downloads data and loads to GCS + PostgreSQL
+docker exec docker-airflow-webserver-1 airflow dags backfill bts_ingestion_dag \
+  --start-date 2023-01-01 --end-date 2025-12-01 --reset-dagruns -y
+
+# Spark processing — GCS bronze → silver + BigQuery load
+docker exec docker-airflow-webserver-1 airflow dags backfill bts_processing_dag \
+  --start-date 2023-01-01 --end-date 2025-12-01 --reset-dagruns -y
+```
+
+> Backfill covers 36 months and may take significant time to complete.
+
+#### 11. Build dbt mart models
+
+```bash
 cd analytics/dbt/bts_airline
 dbt run
 dbt test
 cd ../../..
-
-# 11. Access the dashboard
-# http://localhost:8501
 ```
+
+All 7 models and 18 tests should pass.
+
+#### 12. Access the dashboard
+
+Open `http://localhost:8501` — the Streamlit dashboard queries BigQuery mart tables directly.
+
+---
 
 ### Service Addresses
 
 | Service | Address | Credentials |
 |---|---|---|
 | Airflow UI | http://localhost:8080 | admin / admin |
-| pgAdmin | http://localhost:5050 | values from .env |
+| pgAdmin | http://localhost:8085 | values from .env |
+| Streamlit | http://localhost:8501 | — |
+| Spark UI | http://localhost:4040 | — (while job is running) |
+
+### Notes
+
+- `data/raw/` and `infra/keys/` are in `.gitignore` — never committed to the repo
+- `GCP_KEY_FILENAME` is the single variable controlling the key path across all containers
+- The `airflow-init` container exits after first run — this is expected
+- Backfill triggers 36 Airflow runs — monitor progress in the UI
+- Spark runs in `local[*]` mode using all available CPU cores
+- Streamlit Cloud deployment sleeps after 7 days of inactivity — wakes automatically on access (30–60 sec)
+
+### Service Addresses
+
+| Service | Address | Credentials |
+|---|---|---|
+| Airflow UI | http://localhost:8080 | admin / admin |
+| pgAdmin | http://localhost:8085 | values from .env |
 | Streamlit | http://localhost:8501 | — |
 | Spark UI | http://localhost:4040 | — (while job is running) |
 
